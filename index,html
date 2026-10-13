@@ -1,139 +1,383 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>学校図書室 貸出・返却管理</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
-    #app { display: none; }
-    .record { border-bottom: 1px solid #ccc; padding: 10px 0; }
-    button { padding: 8px 16px; cursor: pointer; }
-    input { padding: 8px; margin-right: 10px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学校図書室 管理アプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0fdf4; }
+        .hidden { display: none !important; }
+    </style>
 </head>
-<body>
-  <h1>図書室 貸出・返却システム</h1>
-  
-  <!-- ログイン画面 -->
-  <div id="login-screen">
-    <p>Googleアカウントでログインしてください。</p>
-    <button id="login-btn">Googleでログイン</button>
-  </div>
+<body class="text-gray-800">
 
-  <!-- アプリ画面（ログイン後に表示） -->
-  <div id="app">
-    <p><span id="user-name"></span> さん、こんにちは！ <button id="logout-btn">ログアウト</button></p>
-    
-    <h3>記録を追加</h3>
-    <input type="text" id="book-title" placeholder="本のタイトル" required>
-    <select id="action-type">
-      <option value="貸出">貸出</option>
-      <option value="返却">返却</option>
-    </select>
-    <button id="submit-btn">記録する</button>
+    <!-- ログイン画面 -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+            <h1 class="text-2xl font-bold text-green-600 mb-2">📚 学校図書室システム</h1>
+            <p class="text-gray-500 mb-8">貸出・返却を記録するにはログインしてください</p>
+            <button id="google-login-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Googleでログイン
+            </button>
+            <div class="mt-4 text-sm text-gray-400">※テスト環境用に自動ログインする場合があります</div>
+        </div>
+    </div>
 
-    <h3>履歴</h3>
-    <div id="records-list"></div>
-  </div>
+    <!-- メイン画面 -->
+    <div id="main-screen" class="hidden min-h-screen flex flex-col">
+        <header class="bg-green-600 text-white shadow-md p-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">📚 学校図書室</h1>
+            <div class="flex items-center gap-4">
+                <span id="user-name-display" class="text-sm font-medium"></span>
+                <button id="logout-btn" class="bg-green-700 hover:bg-green-800 px-3 py-1.5 rounded text-sm transition-colors">ログアウト</button>
+            </div>
+        </header>
 
-  <!-- Firebase SDK の読み込み -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.5.0/firebase-firestore.js";
+        <main class="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full flex flex-col gap-8">
+            
+            <!-- 新規登録セクション -->
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-lg font-bold text-gray-700 mb-4 border-b pb-2">新しく本を登録する</h2>
+                <form id="add-book-form" class="flex flex-col md:flex-row gap-4">
+                    <input type="text" id="book-title" placeholder="本のタイトル" required class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <input type="text" id="book-author" placeholder="著者名" required class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors whitespace-nowrap">登録する</button>
+                </form>
+            </section>
 
-    rules_version = '2';
+            <!-- 本のリスト一覧 -->
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex-1">
+                <h2 class="text-lg font-bold text-gray-700 mb-4 border-b pb-2">図書リスト</h2>
+                <div id="loading-books" class="text-center text-gray-500 py-8">読み込み中...</div>
+                <div id="books-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Books will be injected here -->
+                </div>
+            </section>
+        </main>
+    </div>
 
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+    <!-- カスタムモーダル (alert/confirmの代わり) -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <h3 id="modal-title" class="text-lg font-bold mb-4">メッセージ</h3>
+            <p id="modal-message" class="text-gray-600 mb-6"></p>
+            <div id="modal-inputs" class="hidden mb-6 text-left">
+                <label class="block text-sm font-medium text-gray-700 mb-1">借りる人の名前を入力してください</label>
+                <input type="text" id="borrower-name-input" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div class="flex justify-center gap-3">
+                <button id="modal-cancel-btn" class="hidden px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-800 transition-colors">キャンセル</button>
+                <button id="modal-ok-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition-colors">OK</button>
+            </div>
+        </div>
+    </div>
 
-    // Firebaseの初期化
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // UI要素の取得
-    const loginScreen = document.getElementById('login-screen');
-    const appScreen = document.getElementById('app');
-    const userNameDisplay = document.getElementById('user-name');
-    const recordsList = document.getElementById('records-list');
-    const bookTitleInput = document.getElementById('book-title');
-    const actionTypeSelect = document.getElementById('action-type');
+        // Firebase Configuration injected by environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'school-library-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            // Dummy config for fallback - will error if not replaced by real environment config
+            apiKey: "dummy", authDomain: "dummy", projectId: "dummy"
+        };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-    // ログイン状態の監視
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        loginScreen.style.display = 'none';
-        appScreen.style.display = 'block';
-        userNameDisplay.textContent = user.displayName;
-        loadRecords(); // データを読み込む
-      } else {
-        loginScreen.style.display = 'block';
-        appScreen.style.display = 'none';
-      }
-    });
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-    // ログイン処理
-    document.getElementById('login-btn').addEventListener('click', () => {
-      signInWithPopup(auth, provider).catch(error => console.error(error));
-    });
+        // UI Elements
+        const loginScreen = document.getElementById('login-screen');
+        const mainScreen = document.getElementById('main-screen');
+        const googleLoginBtn = document.getElementById('google-login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const userNameDisplay = document.getElementById('user-name-display');
+        const addBookForm = document.getElementById('add-book-form');
+        const booksList = document.getElementById('books-list');
+        const loadingBooks = document.getElementById('loading-books');
+        
+        // Modal Elements
+        const modal = document.getElementById('custom-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalInputs = document.getElementById('modal-inputs');
+        const borrowerNameInput = document.getElementById('borrower-name-input');
+        const modalOkBtn = document.getElementById('modal-ok-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
-    // ログアウト処理
-    document.getElementById('logout-btn').addEventListener('click', () => {
-      signOut(auth).catch(error => console.error(error));
-    });
+        let currentUser = null;
+        let booksUnsubscribe = null;
 
-    // 記録の追加処理
-    document.getElementById('submit-btn').addEventListener('click', async () => {
-      const title = bookTitleInput.value;
-      const action = actionTypeSelect.value;
-      if (!title) return alert("本のタイトルを入力してください");
+        // Custom Modal Function
+        function showModal(title, message, type = 'alert', onConfirm = null) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            modalInputs.classList.add('hidden');
+            modalCancelBtn.classList.add('hidden');
+            borrowerNameInput.value = '';
 
-      try {
-        await addDoc(collection(db, "library_records"), {
-          bookTitle: title,
-          action: action,
-          userName: auth.currentUser.displayName,
-          userEmail: auth.currentUser.email,
-          createdAt: serverTimestamp()
+            if (type === 'prompt') {
+                modalInputs.classList.remove('hidden');
+                modalCancelBtn.classList.remove('hidden');
+            } else if (type === 'confirm') {
+                modalCancelBtn.classList.remove('hidden');
+            }
+
+            modal.classList.remove('hidden');
+
+            const handleOk = () => {
+                modal.classList.add('hidden');
+                cleanup();
+                if (onConfirm) {
+                    if (type === 'prompt') {
+                        onConfirm(borrowerNameInput.value.trim());
+                    } else {
+                        onConfirm(true);
+                    }
+                }
+            };
+
+            const handleCancel = () => {
+                modal.classList.add('hidden');
+                cleanup();
+                if (onConfirm) onConfirm(false);
+            };
+
+            const cleanup = () => {
+                modalOkBtn.removeEventListener('click', handleOk);
+                modalCancelBtn.removeEventListener('click', handleCancel);
+            };
+
+            modalOkBtn.addEventListener('click', handleOk);
+            modalCancelBtn.addEventListener('click', handleCancel);
+        }
+
+        // Auth Flow Required by strict rules
+        async function authenticate() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                showModal('エラー', '認証に失敗しました。');
+            }
+        }
+
+        // Handle Google Login click
+        googleLoginBtn.addEventListener('click', async () => {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Google Auth error:", error);
+                // Fallback to anonymous if popup blocked/fails in iframe
+                authenticate();
+            }
         });
-        bookTitleInput.value = ''; // 入力欄をクリア
-      } catch (error) {
-        console.error("エラー:", error);
-        alert("記録に失敗しました。ルールの設定を確認してください。");
-      }
-    });
 
-    // データの読み込みと表示（リアルタイム）
-    function loadRecords() {
-      const q = query(collection(db, "library_records"), orderBy("createdAt", "desc"));
-      onSnapshot(q, (snapshot) => {
-        recordsList.innerHTML = '';
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          const date = data.createdAt ? data.createdAt.toDate().toLocaleString('ja-JP') : '記録中...';
-          const div = document.createElement('div');
-          div.className = 'record';
-          div.textContent = `[${date}] ${data.userName}さん が「${data.bookTitle}」を ${data.action} しました。`;
-          recordsList.appendChild(div);
+        // Logout
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.reload();
+            });
         });
-      });
-    }
-  </script>
+
+        // Auth State Observer
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loginScreen.classList.add('hidden');
+                mainScreen.classList.remove('hidden');
+                userNameDisplay.textContent = user.displayName ? `${user.displayName} さん` : `ゲスト (ID: ${user.uid.slice(0,5)}...)`;
+                loadBooks();
+            } else {
+                currentUser = null;
+                loginScreen.classList.remove('hidden');
+                mainScreen.classList.add('hidden');
+                if(booksUnsubscribe) booksUnsubscribe();
+                // If we are in an environment that mandates custom tokens on load
+                if(initialAuthToken) {
+                    authenticate();
+                }
+            }
+        });
+
+        // Firestore path definition (RULE 1)
+        function getBooksCollection() {
+            return collection(db, 'artifacts', appId, 'public', 'data', 'books');
+        }
+
+        // Load Books
+        function loadBooks() {
+            if (!currentUser) return; // RULE 3
+            loadingBooks.classList.remove('hidden');
+
+            const colRef = getBooksCollection();
+            
+            // RULE 2: No complex queries, fetch all and sort in memory if needed
+            booksUnsubscribe = onSnapshot(colRef, (snapshot) => {
+                loadingBooks.classList.add('hidden');
+                booksList.innerHTML = '';
+                
+                const books = [];
+                snapshot.forEach(doc => {
+                    books.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Sort purely in JS (newest first based on timestamp if exists)
+                books.sort((a, b) => {
+                    const timeA = a.createdAt?.toMillis?.() || 0;
+                    const timeB = b.createdAt?.toMillis?.() || 0;
+                    return timeB - timeA;
+                });
+
+                if (books.length === 0) {
+                    booksList.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">まだ本が登録されていません。</div>';
+                    return;
+                }
+
+                books.forEach(book => {
+                    const isBorrowed = book.status === 'borrowed';
+                    const card = document.createElement('div');
+                    card.className = `p-4 rounded-xl border-2 ${isBorrowed ? 'border-amber-200 bg-amber-50' : 'border-green-200 bg-green-50'} relative overflow-hidden transition-all`;
+                    
+                    const statusBadge = isBorrowed 
+                        ? `<span class="inline-block px-2 py-1 bg-amber-200 text-amber-800 text-xs font-bold rounded mb-2">貸出中</span>`
+                        : `<span class="inline-block px-2 py-1 bg-green-200 text-green-800 text-xs font-bold rounded mb-2">貸出可能</span>`;
+
+                    const borrowerInfo = isBorrowed && book.borrowerName
+                        ? `<p class="text-sm text-amber-700 mt-2 font-medium">借りている人: ${book.borrowerName}</p>`
+                        : '';
+
+                    card.innerHTML = `
+                        ${statusBadge}
+                        <h3 class="font-bold text-lg text-gray-800 leading-tight mb-1">${escapeHTML(book.title)}</h3>
+                        <p class="text-sm text-gray-600 mb-4">著者: ${escapeHTML(book.author)}</p>
+                        ${borrowerInfo}
+                        <div class="mt-4 flex justify-end">
+                            ${isBorrowed 
+                                ? `<button class="return-btn bg-gray-800 hover:bg-gray-900 text-white text-sm px-4 py-2 rounded shadow-sm" data-id="${book.id}">返却する</button>`
+                                : `<button class="borrow-btn bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded shadow-sm" data-id="${book.id}">借りる</button>`
+                            }
+                        </div>
+                    `;
+                    booksList.appendChild(card);
+                });
+
+                // Attach event listeners to generated buttons
+                document.querySelectorAll('.borrow-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => handleBorrow(e.target.dataset.id));
+                });
+                document.querySelectorAll('.return-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => handleReturn(e.target.dataset.id));
+                });
+
+            }, (error) => {
+                console.error("Snapshot error:", error);
+                loadingBooks.textContent = "データの読み込みに失敗しました。";
+            });
+        }
+
+        // Add Book
+        addBookForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return; // RULE 3
+
+            const titleInput = document.getElementById('book-title');
+            const authorInput = document.getElementById('book-author');
+            const title = titleInput.value.trim();
+            const author = authorInput.value.trim();
+
+            if (!title || !author) return;
+
+            try {
+                await addDoc(getBooksCollection(), {
+                    title: title,
+                    author: author,
+                    status: 'available',
+                    borrowerName: null,
+                    borrowerId: null,
+                    createdAt: serverTimestamp()
+                });
+                titleInput.value = '';
+                authorInput.value = '';
+                showModal('成功', '本を登録しました！');
+            } catch (error) {
+                console.error("Error adding doc:", error);
+                showModal('エラー', '本の登録に失敗しました。');
+            }
+        });
+
+        // Borrow Book
+        function handleBorrow(bookId) {
+            if (!currentUser) return; // RULE 3
+            showModal('本を借りる', '貸出記録を残すため、名前を入力してください。', 'prompt', async (name) => {
+                if (name === false || !name) return; // Cancelled or empty
+                
+                try {
+                    const bookRef = doc(db, 'artifacts', appId, 'public', 'data', 'books', bookId);
+                    await updateDoc(bookRef, {
+                        status: 'borrowed',
+                        borrowerName: name,
+                        borrowerId: currentUser.uid,
+                        borrowedAt: serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error("Error borrowing:", error);
+                    showModal('エラー', '貸出処理に失敗しました。');
+                }
+            });
+        }
+
+        // Return Book
+        function handleReturn(bookId) {
+            if (!currentUser) return; // RULE 3
+            showModal('返却確認', 'この本を返却済みにしますか？', 'confirm', async (confirmed) => {
+                if (!confirmed) return;
+                
+                try {
+                    const bookRef = doc(db, 'artifacts', appId, 'public', 'data', 'books', bookId);
+                    await updateDoc(bookRef, {
+                        status: 'available',
+                        borrowerName: null,
+                        borrowerId: null,
+                        borrowedAt: null
+                    });
+                } catch (error) {
+                    console.error("Error returning:", error);
+                    showModal('エラー', '返却処理に失敗しました。');
+                }
+            });
+        }
+
+        // Utility
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+    </script>
 </body>
 </html>
